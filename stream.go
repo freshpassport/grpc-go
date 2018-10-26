@@ -850,7 +850,6 @@ func (a *csAttempt) finish(err error) {
 	a.mu.Unlock()
 }
 
-// newClientStream cannot take ac.mu lock inside.
 func (ac *addrConn) newClientStream(ctx context.Context, desc *StreamDesc, method string, t transport.ClientTransport, opts ...CallOption) (_ ClientStream, err error) {
 	if t == nil {
 		// TODO: return RPC error here?
@@ -922,6 +921,13 @@ func (ac *addrConn) newClientStream(ctx context.Context, desc *StreamDesc, metho
 		cp:       cp,
 		comp:     comp,
 		t:        t,
+		done: func(b balancer.DoneInfo) {
+			if b.Err != nil && b.Err != io.EOF {
+				ac.incrCallsFailed()
+			} else {
+				ac.incrCallsSucceeded()
+			}
+		},
 	}
 
 	as.callInfo.stream = as
@@ -932,6 +938,7 @@ func (ac *addrConn) newClientStream(ctx context.Context, desc *StreamDesc, metho
 	}
 	as.s = s
 	as.p = &parser{r: s}
+	ac.incrCallsStarted()
 	if desc != unaryStreamDesc {
 		// Listen on cc and stream contexts to cleanup when the user closes the
 		// ClientConn or cancels the stream context.  In all other cases, an error
