@@ -27,6 +27,7 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	_ "google.golang.org/grpc/healthcheck"
@@ -34,6 +35,7 @@ import (
 	"google.golang.org/grpc/internal/leakcheck"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/resolver/manual"
+	"google.golang.org/grpc/status"
 	testpb "google.golang.org/grpc/test/grpc_testing"
 )
 
@@ -97,6 +99,8 @@ func (s *testHealthServer) Watch(in *healthpb.HealthCheckRequest, stream healthp
 		case <-time.After(5 * time.Second):
 		}
 		return nil
+	case "bar":
+		return status.Error(codes.Unimplemented, "Watching is not supported")
 	default:
 		return nil
 	}
@@ -200,6 +204,84 @@ func TestHealthCheckWatchStateChange(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	if ok := cc.WaitForStateChange(ctx, connectivity.TransientFailure); !ok {
 		t.Fatal("ClientConn is still in TRANSIENT FAILURE state after 5s.")
+	}
+	cancel()
+	if s := cc.GetState(); s != connectivity.Ready {
+		t.Fatalf("ClientConn is in %v state, want READY", s)
+	}
+}
+
+func TestHealthCheckHealthServerNotRegistered(t *testing.T) {
+	defer leakcheck.Check(t)
+	s := grpc.NewServer()
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal("Failed to listen")
+	}
+	go s.Serve(lis)
+	defer s.Stop()
+
+	r, rcleanup := manual.GenerateAndRegisterManualResolver()
+	defer rcleanup()
+	cc, err := grpc.Dial(r.Scheme()+":///test.server", grpc.WithInsecure(), grpc.WithBalancerName("round_robin"))
+	if err != nil {
+		t.Fatal("dial failed")
+	}
+	defer cc.Close()
+
+	r.NewServiceConfig(`{
+	"healthCheckConfig": {
+		"serviceName": "foo"
+	}
+}`)
+	r.NewAddress([]resolver.Address{{Addr: lis.Addr().String()}})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if ok := cc.WaitForStateChange(ctx, connectivity.Idle); !ok {
+		t.Fatal("ClientConn is still in IDLE state after 5s.")
+	}
+
+	if ok := cc.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		t.Fatal("ClientConn is still in CONNECTING state after 5s.")
+	}
+	cancel()
+	if s := cc.GetState(); s != connectivity.Ready {
+		t.Fatalf("ClientConn is in %v state, want READY", s)
+	}
+}
+
+func TestHealthCheckWatchUnimplemented(t *testing.T) {
+	defer leakcheck.Check(t)
+	s := grpc.NewServer()
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal("failed to listen")
+	}
+	ts := newTestHealthServer()
+	healthpb.RegisterHealthServer(s, ts)
+	go s.Serve(lis)
+	defer s.Stop()
+
+	r, rcleanup := manual.GenerateAndRegisterManualResolver()
+	defer rcleanup()
+	cc, err := grpc.Dial(r.Scheme()+":///test.server", grpc.WithInsecure(), grpc.WithBalancerName("round_robin"))
+	if err != nil {
+		t.Fatal("dial failed")
+	}
+	defer cc.Close()
+
+	r.NewServiceConfig(`{
+	"healthCheckConfig": {
+		"serviceName": "bar"
+	}
+}`)
+	r.NewAddress([]resolver.Address{{Addr: lis.Addr().String()}})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if ok := cc.WaitForStateChange(ctx, connectivity.Idle); !ok {
+		t.Fatal("ClientConn is still in IDLE state after 5s.")
+	}
+
+	if ok := cc.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		t.Fatal("ClientConn is still in CONNECTING state after 5s.")
 	}
 	cancel()
 	if s := cc.GetState(); s != connectivity.Ready {
