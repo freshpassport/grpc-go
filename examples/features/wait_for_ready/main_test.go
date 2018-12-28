@@ -95,7 +95,7 @@ func TestRace(*testing.T) {
 	}
 	_, err = str.Recv()
 	if err != nil {
-		// log.Printf("recv err: %v\n", err)
+		log.Printf("recv err: %v\n", err)
 	}
 	trl := str.Trailer()
 	_ = trl
