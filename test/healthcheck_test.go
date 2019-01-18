@@ -156,9 +156,7 @@ func setupClient(c *clientConfig) (cc *grpc.ClientConn, r *manual.Resolver, defe
 	if c.testHealthCheckFuncWrapper != nil {
 		opts = append(opts, internal.WithHealthCheckFunc.(func(internal.HealthChecker) grpc.DialOption)(c.testHealthCheckFuncWrapper))
 	}
-	for _, dopt := range c.extraDialOption {
-		opts = append(opts, dopt)
-	}
+	opts = append(opts, c.extraDialOption...)
 	cc, err = grpc.Dial(r.Scheme()+":///test.server", opts...)
 	if err != nil {
 		rcleanup()
@@ -387,7 +385,6 @@ func (s) TestHealthCheckWithConnClose(t *testing.T) {
 	cc, r, deferFunc, err := setupClient(&clientConfig{
 		balancerName:               "round_robin",
 		testHealthCheckFuncWrapper: testHealthCheckFuncWrapper,
-		extraDialOption:            []grpc.DialOption{grpc.WithWaitForHandshake()},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -689,7 +686,6 @@ func (s) TestHealthCheckWithoutReportHealthCalled(t *testing.T) {
 	_, r, deferFunc, err := setupClient(&clientConfig{
 		balancerName:               "round_robin",
 		testHealthCheckFuncWrapper: testHealthCheckFuncWrapper,
-		extraDialOption:            []grpc.DialOption{grpc.WithWaitForHandshake()},
 	})
 	if err != nil {
 		t.Fatal(err)

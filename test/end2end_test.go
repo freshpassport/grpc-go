@@ -80,8 +80,25 @@ func init() {
 
 type s struct{}
 
+var lcFailed uint32
+
+type errorer struct {
+	t *testing.T
+}
+
+func (e errorer) Errorf(format string, args ...interface{}) {
+	atomic.StoreUint32(&lcFailed, 1)
+	e.t.Errorf(format, args...)
+}
+
 func (s) Teardown(t *testing.T) {
-	leakcheck.Check(t)
+	if atomic.LoadUint32(&lcFailed) == 1 {
+		return
+	}
+	leakcheck.Check(errorer{t: t})
+	if atomic.LoadUint32(&lcFailed) == 1 {
+		t.Log("Leak check disabled for future tests")
+	}
 }
 
 func Test(t *testing.T) {
@@ -969,7 +986,6 @@ func (s) TestTimeoutOnDeadServer(t *testing.T) {
 
 func testTimeoutOnDeadServer(t *testing.T, e env) {
 	te := newTest(t, e)
-	te.customDialOptions = []grpc.DialOption{grpc.WithWaitForHandshake()}
 	te.userAgent = testAppUA
 	te.declareLogNoise(
 		"transport: http2Client.notifyError got notified that the client transport was broken EOF",
@@ -6935,7 +6951,7 @@ func testLargeTimeout(t *testing.T, e env) {
 	for i, maxTimeout := range timeouts {
 		ts.unaryCall = func(ctx context.Context, in *testpb.SimpleRequest) (*testpb.SimpleResponse, error) {
 			deadline, ok := ctx.Deadline()
-			timeout := deadline.Sub(time.Now())
+			timeout := time.Until(deadline)
 			minTimeout := maxTimeout - 5*time.Second
 			if !ok || timeout < minTimeout || timeout > maxTimeout {
 				t.Errorf("ctx.Deadline() = (now+%v), %v; want [%v, %v], true", timeout, ok, minTimeout, maxTimeout)

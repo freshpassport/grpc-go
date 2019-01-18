@@ -834,7 +834,7 @@ func doServerSideInitiatedFailedStreamWithClientBreakFlowControl(tc testpb.TestS
 	}
 	// sleep here to make sure header frame being sent before the data frame we write directly below.
 	time.Sleep(10 * time.Millisecond)
-	payload := make([]byte, 65537, 65537)
+	payload := make([]byte, 65537)
 	dw.getRawConnWrapper().writeRawFrame(http2.FrameData, 0, tc.(*testServiceClientWrapper).getCurrentStreamID(), payload)
 	if _, err := stream.Recv(); err == nil || status.Code(err) != codes.ResourceExhausted {
 		t.Fatalf("%v.Recv() = %v, want error code: %v", stream, err, codes.ResourceExhausted)
@@ -1655,7 +1655,6 @@ func (s) TestCZSubChannelConnectivityState(t *testing.T) {
 	defer cleanup()
 	r.InitialAddrs([]resolver.Address{{Addr: te.srvAddr}})
 	te.resolverScheme = r.Scheme()
-	te.customDialOptions = []grpc.DialOption{grpc.WithWaitForHandshake()}
 	cc := te.clientConn()
 	defer te.tearDown()
 	tc := testpb.NewTestServiceClient(cc)
@@ -1750,7 +1749,6 @@ func (s) TestCZChannelConnectivityState(t *testing.T) {
 	defer cleanup()
 	r.InitialAddrs([]resolver.Address{{Addr: te.srvAddr}})
 	te.resolverScheme = r.Scheme()
-	te.customDialOptions = []grpc.DialOption{grpc.WithWaitForHandshake()}
 	cc := te.clientConn()
 	defer te.tearDown()
 	tc := testpb.NewTestServiceClient(cc)
