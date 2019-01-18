@@ -41,11 +41,8 @@ func (s) TestContextCanceled(t *testing.T) {
 	}
 	defer ss.Stop()
 
-	var i, cntCanceled uint
-	cntPermDenied := func() uint {
-		return i - cntCanceled
-	}
-	for i, cntCanceled = 0, 0; i < 500 && (cntCanceled < 5 || cntPermDenied() < 5); i++ {
+	var cntPermDenied, cntCanceled, delay uint
+	for cntPermDenied, cntCanceled, delay = 0, 0, 0; delay < 100000 && (cntCanceled < 5 || cntPermDenied < 5); {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -54,25 +51,33 @@ func (s) TestContextCanceled(t *testing.T) {
 			t.Fatalf("%v.FullDuplexCall(_) = _, %v, want <nil>", ss.client, err)
 		}
 		// As this duration goes up chances of Recv returning Cancelled will decrease.
-		time.Sleep(time.Duration(i) * time.Microsecond)
+		time.Sleep(time.Duration(delay) * time.Microsecond)
 		cancel()
 		_, err = str.Recv()
 		if err == nil {
 			t.Fatalf("non-nil error expected from Recv()")
 		}
 		code := status.Code(err)
-		if code == codes.Canceled {
-			cntCanceled++
-		}
 		_, ok := str.Trailer()["a"]
-		if code == codes.PermissionDenied && !ok {
-			t.Fatalf(`status err: %v; wanted key "a" in trailer but didn't get it`, err)
-		}
-		if code == codes.Canceled && ok {
-			t.Fatalf(`status err: %v; didn't want key "a" in trailer but got it`, err)
+		if code == codes.PermissionDenied {
+			if !ok {
+				t.Fatalf(`status err: %v; wanted key "a" in trailer but didn't get it`, err)
+			}
+			cntPermDenied++
+			delay++
+		} else if code == codes.Canceled {
+			if ok {
+				t.Fatalf(`status err: %v; didn't want key "a" in trailer but got it`, err)
+			}
+			cntCanceled++
+			if cntCanceled < 5 {
+				delay++
+			} else {
+				delay *= 2
+			}
 		}
 	}
-	if cntCanceled < 5 || cntPermDenied() < 5 {
-		t.Fatalf("got Canceled status %v times and PermissionDenied status %v times but wanted both of them at least 5 times", cntCanceled, cntPermDenied())
+	if cntCanceled < 5 || cntPermDenied < 5 {
+		t.Fatalf("got Canceled status %v times and PermissionDenied status %v times but wanted both of them at least 5 times", cntCanceled, cntPermDenied)
 	}
 }
