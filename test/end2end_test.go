@@ -5152,6 +5152,7 @@ type stubServer struct {
 
 	// Customizable implementations of server handlers.
 	emptyCall      func(ctx context.Context, in *testpb.Empty) (*testpb.Empty, error)
+	unaryCall      func(ctx context.Context, in *testpb.SimpleRequest) (*testpb.SimpleResponse, error)
 	fullDuplexCall func(stream testpb.TestService_FullDuplexCallServer) error
 
 	// A client connected to this service the test may use.  Created in Start().
@@ -5165,6 +5166,10 @@ type stubServer struct {
 
 func (ss *stubServer) EmptyCall(ctx context.Context, in *testpb.Empty) (*testpb.Empty, error) {
 	return ss.emptyCall(ctx, in)
+}
+
+func (ss *stubServer) UnaryCall(ctx context.Context, in *testpb.SimpleRequest) (*testpb.SimpleResponse, error) {
+	return ss.unaryCall(ctx, in)
 }
 
 func (ss *stubServer) FullDuplexCall(stream testpb.TestService_FullDuplexCallServer) error {

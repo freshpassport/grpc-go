@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
 	"strconv"
@@ -602,6 +603,7 @@ func (t *http2Server) handleData(f *http2.DataFrame) {
 }
 
 func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
+	log.Printf("handleRSTStream")
 	s, ok := t.getStream(f)
 	if !ok {
 		return

@@ -20,8 +20,8 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"google.golang.org/grpc"
@@ -42,16 +42,11 @@ func main() {
 	defer conn.Close()
 	c := pb.NewGreeterClient(conn)
 
-	// Contact the server and print out its response.
-	name := defaultName
-	if len(os.Args) > 1 {
-		name = os.Args[1]
+	for i := 0; i < 200; i++ {
+		_, err := c.SayHello(context.Background(), &pb.HelloRequest{})
+		if err != nil {
+			fmt.Println(err)
+		}
+		time.Sleep(time.Second)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
-	if err != nil {
-		log.Fatalf("could not greet: %v", err)
-	}
-	log.Printf("Greeting: %s", r.Message)
 }
