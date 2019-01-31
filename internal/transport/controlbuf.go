@@ -21,6 +21,7 @@ package transport
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"runtime"
 	"sync"
 
@@ -520,6 +521,10 @@ func (l *loopyWriter) registerStreamHandler(h *registerStream) error {
 		wq:    h.wq,
 	}
 	l.estdStreams[h.streamID] = str
+	if l.side == serverSide {
+		log.Printf(`stream registered len(l.estdStreams) %v`, len(l.estdStreams))
+	}
+
 	return nil
 }
 
@@ -657,6 +662,10 @@ func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 		// not be established yet.
 		delete(l.estdStreams, c.streamID)
 		str.deleteSelf()
+		if l.side == serverSide {
+			log.Printf(`stream cleaned up len(l.estdStreams) %v`, len(l.estdStreams))
+		}
+
 	}
 	if c.rst { // If RST_STREAM needs to be sent.
 		if err := l.framer.fr.WriteRSTStream(c.streamID, c.rstCode); err != nil {

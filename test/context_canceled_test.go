@@ -20,7 +20,6 @@ package test
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -46,9 +45,8 @@ func (s) TestContextCanceled(t *testing.T) {
 
 	for i := 0; i < 200; i++ {
 		_, err := ss.client.UnaryCall(context.Background(), &testpb.SimpleRequest{})
-		if err != nil {
-			fmt.Println(err)
-		}
+		log.Printf(`client.UnaryCall %v`, err)
+
 		time.Sleep(time.Second)
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net"
 	"strconv"
@@ -603,7 +602,6 @@ func (t *http2Server) handleData(f *http2.DataFrame) {
 }
 
 func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
-	log.Printf("handleRSTStream")
 	s, ok := t.getStream(f)
 	if !ok {
 		return
@@ -1009,10 +1007,7 @@ func (t *http2Server) Close() error {
 // closeStream clears the footprint of a stream when the stream is not needed
 // any more.
 func (t *http2Server) closeStream(s *Stream, rst bool, rstCode http2.ErrCode, hdr *headerFrame, eosReceived bool) {
-	if s.swapState(streamDone) == streamDone {
-		// If the stream was already done, return.
-		return
-	}
+	s.swapState(streamDone)
 	// In case stream sending and receiving are invoked in separate
 	// goroutines (e.g., bi-directional streaming), cancel needs to be
 	// called to interrupt the potential blocking on other goroutines.
@@ -1023,11 +1018,14 @@ func (t *http2Server) closeStream(s *Stream, rst bool, rstCode http2.ErrCode, hd
 		rstCode:  rstCode,
 		onWrite: func() {
 			t.mu.Lock()
-			if t.activeStreams != nil {
-				delete(t.activeStreams, s.id)
-				if len(t.activeStreams) == 0 {
-					t.idle = time.Now()
-				}
+			if _, ok := t.activeStreams[s.id]; !ok {
+				t.mu.Unlock()
+				return
+			}
+
+			delete(t.activeStreams, s.id)
+			if len(t.activeStreams) == 0 {
+				t.idle = time.Now()
 			}
 			t.mu.Unlock()
 			if channelz.IsOn() {
