@@ -42,7 +42,7 @@ func (s) TestContextCanceled(t *testing.T) {
 		t.Fatalf("Error starting endpoint server: %v", err)
 	}
 	defer ss.Stop()
-
+	ss.client.
 	for i := 0; i < 200; i++ {
 		_, err := ss.client.UnaryCall(context.Background(), &testpb.SimpleRequest{})
 		log.Printf(`client.UnaryCall %v`, err)
