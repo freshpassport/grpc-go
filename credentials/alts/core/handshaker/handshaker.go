@@ -239,7 +239,7 @@ func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credent
 
 	p := make([]byte, frameLimit)
 	n, err := h.conn.Read(p)
-	log.Printf("read: %#v", p)
+	//log.Printf("read: %#v", p)
 	log.Printf("ServerHandshake 3")
 	if err != nil {
 		return nil, nil, err
