@@ -273,11 +273,13 @@ func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credent
 }
 
 func (h *altsHandshaker) doHandshake(req *altspb.HandshakerReq) (net.Conn, *altspb.HandshakerResult, error) {
+	log.Printf("doHandshake 1")
 	resp, err := h.accessHandshakerService(req)
 	if err != nil {
 		return nil, nil, err
 	}
 	// Check of the returned status is an error.
+	log.Printf("doHandshake 2")
 	if resp.GetStatus() != nil {
 		if got, want := resp.GetStatus().Code, uint32(codes.OK); got != want {
 			return nil, nil, fmt.Errorf("%v", resp.GetStatus().Details)
@@ -289,19 +291,23 @@ func (h *altsHandshaker) doHandshake(req *altspb.HandshakerReq) (net.Conn, *alts
 		extra = req.GetServerStart().GetInBytes()[resp.GetBytesConsumed():]
 	}
 	result, extra, err := h.processUntilDone(resp, extra)
+	log.Printf("doHandshake 3")
 	if err != nil {
 		return nil, nil, err
 	}
 	// The handshaker returns a 128 bytes key. It should be truncated based
 	// on the returned record protocol.
 	keyLen, ok := keyLength[result.RecordProtocol]
+	log.Printf("doHandshake 4")
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown resulted record protocol %v", result.RecordProtocol)
 	}
 	sc, err := conn.NewConn(h.conn, h.side, result.GetRecordProtocol(), result.KeyData[:keyLen], extra)
+	log.Printf("doHandshake 5")
 	if err != nil {
 		return nil, nil, err
 	}
+	log.Printf("doHandshake 6")
 	return sc, result, nil
 }
 
