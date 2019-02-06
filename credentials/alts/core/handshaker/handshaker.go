@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 
@@ -225,17 +226,20 @@ func (h *altsHandshaker) ClientHandshake(ctx context.Context) (net.Conn, credent
 // ServerHandshake starts and completes a server ALTS handshaking for GCP. Once
 // done, ServerHandshake returns a secure connection.
 func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credentials.AuthInfo, error) {
+	log.Printf("ServerHandshake 1")
 	if !acquire(1) {
 		return nil, nil, errDropped
 	}
 	defer release(1)
 
+	log.Printf("ServerHandshake 2")
 	if h.side != core.ServerSide {
 		return nil, nil, errors.New("only handshakers created using NewServerHandshaker can perform a server handshaker")
 	}
 
 	p := make([]byte, frameLimit)
 	n, err := h.conn.Read(p)
+	log.Printf("ServerHandshake 3")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -259,10 +263,12 @@ func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credent
 	}
 
 	conn, result, err := h.doHandshake(req)
+	log.Printf("ServerHandshake 4")
 	if err != nil {
 		return nil, nil, err
 	}
 	authInfo := authinfo.New(result)
+	log.Printf("ServerHandshake 5")
 	return conn, authInfo, nil
 }
 
