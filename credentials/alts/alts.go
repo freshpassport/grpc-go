@@ -221,9 +221,9 @@ func (g *altsTC) ClientHandshake(ctx context.Context, addr string, rawConn net.C
 
 // ServerHandshake implements the server side ALTS handshaker.
 func (g *altsTC) ServerHandshake(rawConn net.Conn) (_ net.Conn, _ credentials.AuthInfo, err error) {
-	if !vmOnGCP {
-		return nil, nil, ErrUntrustedPlatform
-	}
+	//if !vmOnGCP {
+	//	return nil, nil, ErrUntrustedPlatform
+	//}
 	// Connecting to ALTS handshaker service.
 	hsConn, err := service.Dial(g.hsAddress)
 	if err != nil {
