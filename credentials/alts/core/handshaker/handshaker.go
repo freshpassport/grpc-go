@@ -23,12 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 
 	"golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/alts/core"
@@ -226,21 +225,17 @@ func (h *altsHandshaker) ClientHandshake(ctx context.Context) (net.Conn, credent
 // ServerHandshake starts and completes a server ALTS handshaking for GCP. Once
 // done, ServerHandshake returns a secure connection.
 func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credentials.AuthInfo, error) {
-	log.Printf("ServerHandshake 1")
 	if !acquire(1) {
 		return nil, nil, errDropped
 	}
 	defer release(1)
 
-	log.Printf("ServerHandshake 2")
 	if h.side != core.ServerSide {
 		return nil, nil, errors.New("only handshakers created using NewServerHandshaker can perform a server handshaker")
 	}
 
 	p := make([]byte, frameLimit)
 	n, err := h.conn.Read(p)
-	//log.Printf("read: %#v", p)
-	log.Printf("ServerHandshake 3")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -264,23 +259,19 @@ func (h *altsHandshaker) ServerHandshake(ctx context.Context) (net.Conn, credent
 	}
 
 	conn, result, err := h.doHandshake(req)
-	log.Printf("ServerHandshake 4")
 	if err != nil {
 		return nil, nil, err
 	}
 	authInfo := authinfo.New(result)
-	log.Printf("ServerHandshake 5")
 	return conn, authInfo, nil
 }
 
 func (h *altsHandshaker) doHandshake(req *altspb.HandshakerReq) (net.Conn, *altspb.HandshakerResult, error) {
-	log.Printf("doHandshake 1")
 	resp, err := h.accessHandshakerService(req)
 	if err != nil {
 		return nil, nil, err
 	}
 	// Check of the returned status is an error.
-	log.Printf("doHandshake 2")
 	if resp.GetStatus() != nil {
 		if got, want := resp.GetStatus().Code, uint32(codes.OK); got != want {
 			return nil, nil, fmt.Errorf("%v", resp.GetStatus().Details)
@@ -292,23 +283,19 @@ func (h *altsHandshaker) doHandshake(req *altspb.HandshakerReq) (net.Conn, *alts
 		extra = req.GetServerStart().GetInBytes()[resp.GetBytesConsumed():]
 	}
 	result, extra, err := h.processUntilDone(resp, extra)
-	log.Printf("doHandshake 3")
 	if err != nil {
 		return nil, nil, err
 	}
 	// The handshaker returns a 128 bytes key. It should be truncated based
 	// on the returned record protocol.
 	keyLen, ok := keyLength[result.RecordProtocol]
-	log.Printf("doHandshake 4")
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown resulted record protocol %v", result.RecordProtocol)
 	}
 	sc, err := conn.NewConn(h.conn, h.side, result.GetRecordProtocol(), result.KeyData[:keyLen], extra)
-	log.Printf("doHandshake 5")
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Printf("doHandshake 6")
 	return sc, result, nil
 }
 

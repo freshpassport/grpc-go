@@ -221,9 +221,9 @@ func (g *altsTC) ClientHandshake(ctx context.Context, addr string, rawConn net.C
 
 // ServerHandshake implements the server side ALTS handshaker.
 func (g *altsTC) ServerHandshake(rawConn net.Conn) (_ net.Conn, _ credentials.AuthInfo, err error) {
-	//if !vmOnGCP {
-	//	return nil, nil, ErrUntrustedPlatform
-	//}
+	if !vmOnGCP {
+		return nil, nil, ErrUntrustedPlatform
+	}
 	// Connecting to ALTS handshaker service.
 	hsConn, err := service.Dial(g.hsAddress)
 	if err != nil {
@@ -257,8 +257,7 @@ func (g *altsTC) ServerHandshake(rawConn net.Conn) (_ net.Conn, _ credentials.Au
 	}
 	match, _ := checkRPCVersions(opts.RPCVersions, altsAuthInfo.PeerRPCVersions())
 	if !match {
-		//return nil, nil, fmt.Errorf("client-side RPC versions is not compatible with this server, local versions: %v, peer versions: %v", opts.RPCVersions, altsAuthInfo.PeerRPCVersions())
-		grpclog.Infof("apolcyn - hack - ignoring bad RPC versions from client")
+		return nil, nil, fmt.Errorf("client-side RPC versions is not compatible with this server, local versions: %v, peer versions: %v", opts.RPCVersions, altsAuthInfo.PeerRPCVersions())
 	}
 	return secConn, authInfo, nil
 }
