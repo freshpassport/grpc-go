@@ -513,6 +513,7 @@ func printThroughput(requestCount uint64, requestSize int, responseCount uint64,
 }
 
 func main() {
+	fmt.Println(os.Getpid())
 	before()
 	featuresPos := make([]int, 10)
 	// 0:enableTracing 1:ltc 2:kbps 3:mtu 4:maxC 5:reqSize 6:respSize
