@@ -871,6 +871,11 @@ func testClientBinaryLog(t *testing.T, c *rpcConfig) error {
 	var errored bool
 	for i := 0; i < len(got); i++ {
 		if !equalLogEntry(want[i], got[i]) {
+			ret := new(testpb.SimpleResponse)
+			proto.Unmarshal(want[i].GetMessage().GetData(), ret)
+			t.Errorf("want: %+v", ret)
+			proto.Unmarshal(got[i].GetMessage().GetData(), ret)
+			t.Errorf("got: %+v", ret)
 			t.Errorf("entry: %d, want %+v, got %+v", i, want[i], got[i])
 			errored = true
 		}

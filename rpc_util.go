@@ -489,6 +489,8 @@ type parser struct {
 	// The header of a gRPC message. Find more detail at
 	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
 	header [5]byte
+
+	msgBuffer []byte
 }
 
 // recvMsg reads a complete gRPC message from the stream.
@@ -504,7 +506,7 @@ type parser struct {
 // No other error values or types must be returned, which also means
 // that the underlying io.Reader must not return an incompatible
 // error.
-func (p *parser) recvMsg(maxReceiveMessageSize int) (pf payloadFormat, msg []byte, err error) {
+func (p *parser) recvMsg(maxReceiveMessageSize int, payInfo *payloadInfo) (pf payloadFormat, msg []byte, err error) {
 	if _, err := p.r.Read(p.header[:]); err != nil {
 		return 0, nil, err
 	}
@@ -523,7 +525,7 @@ func (p *parser) recvMsg(maxReceiveMessageSize int) (pf payloadFormat, msg []byt
 	}
 	// TODO(bradfitz,zhaoq): garbage. reuse buffer after proto decoding instead
 	// of making it for each message:
-	msg = make([]byte, int(length))
+	msg = p.getMsgBuffer(int(length), payInfo == nil)
 	if _, err := p.r.Read(msg); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
@@ -531,6 +533,16 @@ func (p *parser) recvMsg(maxReceiveMessageSize int) (pf payloadFormat, msg []byt
 		return 0, nil, err
 	}
 	return pf, msg, nil
+}
+
+func (p *parser) getMsgBuffer(length int, reuse bool) []byte {
+	if !reuse {
+		return make([]byte, int(length))
+	}
+	if cap(p.msgBuffer) < length {
+		p.msgBuffer = make([]byte, length)
+	}
+	return p.msgBuffer[:length]
 }
 
 // encode serializes msg and returns a buffer containing the message, or an
@@ -636,7 +648,7 @@ type payloadInfo struct {
 }
 
 func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor) ([]byte, error) {
-	pf, d, err := p.recvMsg(maxReceiveMessageSize)
+	pf, d, err := p.recvMsg(maxReceiveMessageSize, payInfo)
 	if err != nil {
 		return nil, err
 	}
