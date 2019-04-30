@@ -67,7 +67,7 @@ type testStreamHandler struct {
 func (h *testStreamHandler) handleStream(t *testing.T, s *transport.Stream) {
 	p := &parser{r: s}
 	for {
-		pf, req, err := p.recvMsg(math.MaxInt32, nil)
+		pf, req, err := p.recvMsg(math.MaxInt32, true)
 		if err == io.EOF {
 			break
 		}

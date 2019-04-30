@@ -506,7 +506,7 @@ type parser struct {
 // No other error values or types must be returned, which also means
 // that the underlying io.Reader must not return an incompatible
 // error.
-func (p *parser) recvMsg(maxReceiveMessageSize int, payInfo *payloadInfo) (pf payloadFormat, msg []byte, err error) {
+func (p *parser) recvMsg(maxReceiveMessageSize int, reuseMsgBuffer bool) (pf payloadFormat, msg []byte, err error) {
 	if _, err := p.r.Read(p.header[:]); err != nil {
 		return 0, nil, err
 	}
@@ -525,7 +525,7 @@ func (p *parser) recvMsg(maxReceiveMessageSize int, payInfo *payloadInfo) (pf pa
 	}
 	// TODO(bradfitz,zhaoq): garbage. reuse buffer after proto decoding instead
 	// of making it for each message:
-	msg = p.getMsgBuffer(int(length), payInfo == nil)
+	msg = p.getMsgBuffer(int(length), reuseMsgBuffer)
 	if _, err := p.r.Read(msg); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
@@ -648,7 +648,7 @@ type payloadInfo struct {
 }
 
 func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor) ([]byte, error) {
-	pf, d, err := p.recvMsg(maxReceiveMessageSize, payInfo)
+	pf, d, err := p.recvMsg(maxReceiveMessageSize, payInfo == nil)
 	if err != nil {
 		return nil, err
 	}

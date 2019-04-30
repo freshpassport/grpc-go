@@ -65,7 +65,7 @@ func (s) TestSimpleParsing(t *testing.T) {
 	} {
 		buf := fullReader{bytes.NewReader(test.p)}
 		parser := &parser{r: buf}
-		pt, b, err := parser.recvMsg(math.MaxInt32, nil)
+		pt, b, err := parser.recvMsg(math.MaxInt32, true)
 		if err != test.err || !bytes.Equal(b, test.b) || pt != test.pt {
 			t.Fatalf("parser{%v}.recvMsg(_) = %v, %v, %v\nwant %v, %v, %v", test.p, pt, b, err, test.pt, test.b, test.err)
 		}
@@ -87,14 +87,14 @@ func (s) TestMultipleParsing(t *testing.T) {
 		{compressionNone, []byte("d")},
 	}
 	for i, want := range wantRecvs {
-		pt, data, err := parser.recvMsg(math.MaxInt32, nil)
+		pt, data, err := parser.recvMsg(math.MaxInt32, true)
 		if err != nil || pt != want.pt || !reflect.DeepEqual(data, want.data) {
 			t.Fatalf("after %d calls, parser{%v}.recvMsg(_) = %v, %v, %v\nwant %v, %v, <nil>",
 				i, p, pt, data, err, want.pt, want.data)
 		}
 	}
 
-	pt, data, err := parser.recvMsg(math.MaxInt32, nil)
+	pt, data, err := parser.recvMsg(math.MaxInt32, true)
 	if err != io.EOF {
 		t.Fatalf("after %d recvMsgs calls, parser{%v}.recvMsg(_) = %v, %v, %v\nwant _, _, %v",
 			len(wantRecvs), p, pt, data, err, io.EOF)
