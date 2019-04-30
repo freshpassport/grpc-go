@@ -134,12 +134,12 @@ func streamBenchmark(startTimer func(), stopTimer func(uint64), benchFeatures st
 }
 
 func unconstrainedStreamBenchmark(benchFeatures stats.Features, warmuptime, benchtime time.Duration) (uint64, uint64) {
-	var sender, recver func(int)
+	var sender func(int)
 	var cleanup func()
 	if benchFeatures.EnablePreloader {
-		sender, recver, cleanup = makeFuncUnconstrainedStreamPreloaded(benchFeatures)
+		sender, _, cleanup = makeFuncUnconstrainedStreamPreloaded(benchFeatures)
 	} else {
-		sender, recver, cleanup = makeFuncUnconstrainedStream(benchFeatures)
+		sender, _, cleanup = makeFuncUnconstrainedStream(benchFeatures)
 	}
 	defer cleanup()
 
@@ -148,7 +148,7 @@ func unconstrainedStreamBenchmark(benchFeatures stats.Features, warmuptime, benc
 		requestCount  uint64
 		responseCount uint64
 	)
-	wg.Add(2 * benchFeatures.MaxConcurrentCalls)
+	wg.Add(benchFeatures.MaxConcurrentCalls)
 
 	// Resets the counters once warmed up
 	go func() {
@@ -167,17 +167,6 @@ func unconstrainedStreamBenchmark(benchFeatures stats.Features, warmuptime, benc
 				}
 				sender(pos)
 				atomic.AddUint64(&requestCount, 1)
-			}
-			wg.Done()
-		}(i)
-		go func(pos int) {
-			for {
-				t := time.Now()
-				if t.After(bmEnd) {
-					break
-				}
-				recver(pos)
-				atomic.AddUint64(&responseCount, 1)
 			}
 			wg.Done()
 		}(i)

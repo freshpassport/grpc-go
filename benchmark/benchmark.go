@@ -110,21 +110,6 @@ func (s *testServer) StreamingCall(stream testpb.BenchmarkService_StreamingCallS
 
 func (s *testServer) UnconstrainedStreamingCall(stream testpb.BenchmarkService_UnconstrainedStreamingCallServer) error {
 	in := new(testpb.SimpleRequest)
-	// Receive a message to learn response type and size.
-	err := stream.RecvMsg(in)
-	if err == io.EOF {
-		// read done.
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-
-	response := &testpb.SimpleResponse{
-		Payload: new(testpb.Payload),
-	}
-	setPayload(response.Payload, in.ResponseType, int(in.ResponseSize))
-
 	go func() {
 		for {
 			// Using RecvMsg rather than Recv to prevent reallocation of SimpleRequest.
@@ -134,18 +119,6 @@ func (s *testServer) UnconstrainedStreamingCall(stream testpb.BenchmarkService_U
 			case codes.OK:
 			default:
 				log.Fatalf("server recv error: %v", err)
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			err := stream.Send(response)
-			switch status.Code(err) {
-			case codes.Unavailable:
-			case codes.OK:
-			default:
-				log.Fatalf("server send error: %v", err)
 			}
 		}
 	}()
