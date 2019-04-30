@@ -525,7 +525,15 @@ func (p *parser) recvMsg(maxReceiveMessageSize int, reuseMsgBuffer bool) (pf pay
 	}
 	// TODO(bradfitz,zhaoq): garbage. reuse buffer after proto decoding instead
 	// of making it for each message:
-	msg = p.getMsgBuffer(int(length), reuseMsgBuffer)
+	l := int(length)
+	if !reuseMsgBuffer {
+		msg = make([]byte, l)
+	} else {
+		if cap(p.msgBuffer) < l {
+			p.msgBuffer = make([]byte, l)
+		}
+		msg = p.msgBuffer[:l]
+	}
 	if _, err := p.r.Read(msg); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
@@ -533,16 +541,6 @@ func (p *parser) recvMsg(maxReceiveMessageSize int, reuseMsgBuffer bool) (pf pay
 		return 0, nil, err
 	}
 	return pf, msg, nil
-}
-
-func (p *parser) getMsgBuffer(length int, reuse bool) []byte {
-	if !reuse {
-		return make([]byte, int(length))
-	}
-	if cap(p.msgBuffer) < length {
-		p.msgBuffer = make([]byte, length)
-	}
-	return p.msgBuffer[:length]
 }
 
 // encode serializes msg and returns a buffer containing the message, or an
