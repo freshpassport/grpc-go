@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
 	"strconv"
@@ -429,6 +430,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 	defer close(t.readerDone)
 	for {
 		frame, err := t.framer.fr.ReadFrame()
+		log.Print(frame, err)
 		atomic.StoreUint32(&t.activity, 1)
 		if err != nil {
 			if se, ok := err.(http2.StreamError); ok {
