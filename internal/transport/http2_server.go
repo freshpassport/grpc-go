@@ -284,8 +284,9 @@ func newHTTP2Server(conn net.Conn, config *ServerConfig) (_ ServerTransport, err
 }
 
 // operateHeader takes action on the decoded headers.
-func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
+func (t *http2Server) operateHeaders(wg *sync.WaitGroup, frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
 	streamID := frame.Header().StreamID
+	headerLength := frame.Header().Length
 	state := &decodeState{
 		serverSide: true,
 	}
@@ -382,14 +383,28 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 		t.idle = time.Time{}
 	}
 	t.mu.Unlock()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t.handleStream(s, headerLength, handle, traceCtx)
+	}()
+
+	return false
+}
+
+func (t *http2Server) handleStream(s *Stream, headerLength uint32, handle func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	if channelz.IsOn() {
 		atomic.AddInt64(&t.czData.streamsStarted, 1)
 		atomic.StoreInt64(&t.czData.lastStreamCreatedTime, time.Now().UnixNano())
 	}
+
 	s.requestRead = func(n int) {
 		t.adjustWindow(s, uint32(n))
 	}
+
 	s.ctx = traceCtx(s.ctx, s.method)
+
 	if t.stats != nil {
 		s.ctx = t.stats.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
 		inHeader := &stats.InHeader{
@@ -397,12 +412,15 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 			RemoteAddr:  t.remoteAddr,
 			LocalAddr:   t.localAddr,
 			Compression: s.recvCompress,
-			WireLength:  int(frame.Header().Length),
+			WireLength:  int(headerLength),
 		}
 		t.stats.HandleRPC(s.ctx, inHeader)
 	}
+
 	s.ctxDone = s.ctx.Done()
+
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
+
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
 			ctx:     s.ctx,
@@ -413,19 +431,22 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 			t.updateWindow(s, uint32(n))
 		},
 	}
+
 	// Register the stream with loopy.
 	t.controlBuf.put(&registerStream{
 		streamID: s.id,
 		wq:       s.wq,
 	})
+
 	handle(s)
-	return false
 }
 
 // HandleStreams receives incoming streams using the given handler. This is
 // typically run in a separate goroutine.
 // traceCtx attaches trace to ctx and returns the new context.
 func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.Context, string) context.Context) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	defer close(t.readerDone)
 	for {
 		frame, err := t.framer.fr.ReadFrame()
@@ -458,7 +479,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		}
 		switch frame := frame.(type) {
 		case *http2.MetaHeadersFrame:
-			if t.operateHeaders(frame, handle, traceCtx) {
+			if t.operateHeaders(&wg, frame, handle, traceCtx) {
 				t.Close()
 				break
 			}
