@@ -943,6 +943,8 @@ func TestClientBinaryLogCancel(t *testing.T) {
 }
 
 func testServerBinaryLog(t *testing.T, c *rpcConfig) error {
+	time.Sleep(100 * time.Millisecond)
+	testSink.clear()
 	defer testSink.clear()
 	expect := runRPCs(t, &testConfig{}, c)
 	want := expect.toServerLogEntries()
