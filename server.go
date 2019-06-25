@@ -709,11 +709,8 @@ func (s *Server) newHTTP2Transport(c net.Conn, authInfo credentials.AuthInfo) tr
 
 func (s *Server) serveStreams(st transport.ServerTransport) {
 	defer st.Close()
-	var wg sync.WaitGroup
 	st.HandleStreams(func(stream *transport.Stream) {
-		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			s.handleStream(st, stream, s.traceInfo(st, stream))
 		}()
 	}, func(ctx context.Context, method string) context.Context {
@@ -723,7 +720,6 @@ func (s *Server) serveStreams(st transport.ServerTransport) {
 		tr := trace.New("grpc.Recv."+methodFamily(method), method)
 		return trace.NewContext(ctx, tr)
 	})
-	wg.Wait()
 }
 
 var _ http.Handler = (*Server)(nil)
